@@ -9,37 +9,37 @@ import javax.websocket.Session;
 import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 @ServerEndpoint("/websocket")
 @Component
 public class MyWebSocket {
 
-    private static int onlineCount = 0;
+    private static AtomicLong onlineCount = new AtomicLong();
 
     private static ConcurrentHashMap<String, Session> webSocketMap = new ConcurrentHashMap<>();
 
     @OnOpen
     public void onOpen(Session session) {
         webSocketMap.put(session.getId(), session);
-        addOnlineCount();
-        System.out.println("有新链接加入!当前在线人数为" + getOnlineCount());
+        System.out.println("有新链接加入!当前在线人数为:\t" + onlineCount.incrementAndGet());
     }
 
     @OnClose
     public void onClose(Session session) {
         webSocketMap.remove(session.getId());
-        subOnlineCount();
-        System.out.println("有一链接关闭!当前在线人数为" + getOnlineCount());
+        System.out.println("有一链接关闭!当前在线人数为:\t" + onlineCount.decrementAndGet());
     }
 
     @OnMessage
     public void onMessage(String message, Session session) throws IOException {
+        System.out.println("收到消息:\t" + message);
         if (message.contains("#")) {
             String[] msgMap = message.split("#");
             String targetId = msgMap[0];
             String msg = String.format("[%s]:\t%s", session.getId(), msgMap[1]);
-            session.getBasicRemote().sendText(message + "[自己]");
-            // 群发消息
+            session.getBasicRemote().sendText(message + "[self]");
+            // 单发消息
             for (Session item : webSocketMap.values()) {
                 if (item.getId().equals(targetId)) {
                     sendMessage(item, msg);
@@ -47,7 +47,6 @@ public class MyWebSocket {
             }
         } else {
             String msg = String.format("[%s]:\t%s", session.getId(), message);
-            System.out.println(msg);
             session.getBasicRemote().sendText(msg + "[自己]");
             // 群发消息
             for (Session item : webSocketMap.values()) {
@@ -58,20 +57,8 @@ public class MyWebSocket {
         }
     }
 
-    public void sendMessage(Session session, String message) throws IOException {
+    private void sendMessage(Session session, String message) throws IOException {
         session.getBasicRemote().sendText(message);
-    }
-
-    public static synchronized int getOnlineCount() {
-        return MyWebSocket.onlineCount;
-    }
-
-    public static synchronized void addOnlineCount() {
-        MyWebSocket.onlineCount++;
-    }
-
-    public static synchronized void subOnlineCount() {
-        MyWebSocket.onlineCount--;
     }
 
 }
