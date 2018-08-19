@@ -1,0 +1,149 @@
+
+<!-- saved from url=(0022)http://127.0.0.1:8080/ -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Web Socket Performance Test</title></head>
+<body>
+<h2>WebSocket Performance Test</h2>
+<label>Connection Status:</label>
+<label id="connectionLabel">Connected</label><br>
+<form onsubmit="return false;">
+Message size:<input type="text" id="messageSize" value="1024"><br>
+Number of messages:<input type="text" id="nrMessages" value="100000"><br>
+Data Type:<input type="radio" name="type" id="typeText" value="text" checked="">text<input type="radio" name="type" id="typeBinary" value="binary">binary<br>
+Mode:<br>
+<input type="radio" name="mode" id="modeSingle" value="single" checked="">Wait for response after each messages<br>
+<input type="radio" name="mode" id="modeAll" value="all">Send all messages and then wait for all responses<br>
+<input type="checkbox" id="verifiyResponses">Verify responded messages<br>
+<input type="button" value="Start Benchmark" onclick="startBenchmark()">
+<h3>Output</h3>
+<textarea id="output" style="width:500px;height:300px;"></textarea>
+<br>
+<input type="button" value="Clear" onclick="clearText()">
+</form>
+<script type="text/javascript">
+var benchRunning = false;
+var messageSize = 0;
+var totalMessages = 0;
+var rcvdMessages = 0;
+var isBinary = true;
+var isSingle = true;
+var verifiyResponses = false;
+var benchData = null;
+var startTime;
+var endTime;
+var socket;
+var output = document.getElementById('output');
+var connectionLabel = document.getElementById('connectionLabel');
+if (!window.WebSocket) {
+  window.WebSocket = window.MozWebSocket;
+}
+if (window.WebSocket) {
+  socket = new WebSocket("ws://127.0.0.1:8080/websocket");
+  socket.binaryType = 'arraybuffer';
+  socket.onmessage = function(event) {
+    if (verifiyResponses) {
+        if (isBinary) {
+            if (!(event.data instanceof ArrayBuffer) || 
+                  event.data.byteLength != benchData.byteLength) {
+                onInvalidResponse(benchData, event.data);
+                return;
+            } else {
+                var v = new Uint8Array(event.data);
+                for (var j = 0; j < benchData.byteLength; j++) {
+                    if (v[j] != benchData[j]) {
+                        onInvalidResponse(benchData, event.data);
+                        return;
+                    }
+                }
+            }
+        } else {
+            if (event.data != benchData) {
+                onInvalidResponse(benchData, event.data);
+                return;
+            }
+        }
+    }
+    rcvdMessages++;
+    if (rcvdMessages == totalMessages) {
+        onFinished();
+    } else if (isSingle) {
+        socket.send(benchData);
+    }
+  };
+  socket.onopen = function(event) {
+    connectionLabel.innerHTML = "Connected";
+  };
+  socket.onclose = function(event) {
+    benchRunning = false;
+    connectionLabel.innerHTML = "Disconnected";
+  };
+} else {
+  alert("Your browser does not support Web Socket.");
+}
+
+function onInvalidResponse(sent,recvd) {
+    socket.close();
+    alert("Error: Sent data did not match the received data!");
+}
+
+function clearText() {
+    output.value="";
+}
+
+function createBenchData() {
+    if (isBinary) {
+        benchData = new Uint8Array(messageSize);
+        for (var i=0; i < messageSize; i++) {
+            benchData[i] += Math.floor(Math.random() * 255);
+        }
+    } else { 
+        benchData = "";
+        for (var i=0; i < messageSize; i++) {
+            benchData += String.fromCharCode(Math.floor(Math.random() * (123 - 65) + 65));
+        }
+    }
+}
+
+function startBenchmark(message) {
+  if (!window.WebSocket || benchRunning) { return; }
+  if (socket.readyState == WebSocket.OPEN) {
+    isBinary = document.getElementById('typeBinary').checked;
+    isSingle = document.getElementById('modeSingle').checked;
+    verifiyResponses = document.getElementById('verifiyResponses').checked;
+    messageSize = parseInt(document.getElementById('messageSize').value);
+    totalMessages = parseInt(document.getElementById('nrMessages').value);
+    if (isNaN(messageSize) || isNaN(totalMessages)) return;
+    createBenchData();
+    output.value = output.value + '\nStarting Benchmark';
+    rcvdMessages = 0;
+    benchRunning = true;
+    startTime = new Date();
+    if (isSingle) {
+        socket.send(benchData);
+    } else {
+        for (var i = 0; i < totalMessages; i++) socket.send(benchData);
+    }
+  } else {
+    alert("The socket is not open.");
+  }
+}
+
+function onFinished() {
+    endTime = new Date();
+    var duration = (endTime - startTime) / 1000.0;
+    output.value = output.value + '\nTest took: ' + duration + 's';
+    var messagesPerS = totalMessages / duration;
+    output.value = output.value + '\nPerformance: ' + messagesPerS + ' Messages/s';
+    output.value = output.value + ' in each direction';
+    output.value = output.value + '\nRound trip: ' + 1000.0/messagesPerS + 'ms';
+    var throughput = messageSize * totalMessages / duration;
+    var throughputText;
+    if (isBinary) throughputText = throughput / (1024*1024) + ' MB/s';
+    else throughputText = throughput / (1000*1000) + ' MChars/s';
+    output.value = output.value + '\nThroughput: ' + throughputText;
+    output.value = output.value + ' in each direction';
+    benchRunning = false;
+}
+</script>
+
+
+<audio controls="controls" style="display: none;"></audio></body><style type="text/css">#yddContainer{display:block;font-family:Microsoft YaHei;position:relative;width:100%;height:100%;top:-4px;left:-4px;font-size:12px;border:1px solid}#yddTop{display:block;height:22px}#yddTopBorderlr{display:block;position:static;height:17px;padding:2px 28px;line-height:17px;font-size:12px;color:#5079bb;font-weight:bold;border-style:none solid;border-width:1px}#yddTopBorderlr .ydd-sp{position:absolute;top:2px;height:0;overflow:hidden}.ydd-icon{left:5px;width:17px;padding:0px 0px 0px 0px;padding-top:17px;background-position:-16px -44px}.ydd-close{right:5px;width:16px;padding-top:16px;background-position:left -44px}#yddKeyTitle{float:left;text-decoration:none}#yddMiddle{display:block;margin-bottom:10px}.ydd-tabs{display:block;margin:5px 0;padding:0 5px;height:18px;border-bottom:1px solid}.ydd-tab{display:block;float:left;height:18px;margin:0 5px -1px 0;padding:0 4px;line-height:18px;border:1px solid;border-bottom:none}.ydd-trans-container{display:block;line-height:160%}.ydd-trans-container a{text-decoration:none;}#yddBottom{position:absolute;bottom:0;left:0;width:100%;height:22px;line-height:22px;overflow:hidden;background-position:left -22px}.ydd-padding010{padding:0 10px}#yddWrapper{color:#252525;z-index:10001;background:url(chrome-extension://eopjamdnofihpioajgfdikhhbobonhbb/ab20.png);}#yddContainer{background:#fff;border-color:#4b7598}#yddTopBorderlr{border-color:#f0f8fc}#yddWrapper .ydd-sp{background-image:url(chrome-extension://eopjamdnofihpioajgfdikhhbobonhbb/ydd-sprite.png)}#yddWrapper a,#yddWrapper a:hover,#yddWrapper a:visited{color:#50799b}#yddWrapper .ydd-tabs{color:#959595}.ydd-tabs,.ydd-tab{background:#fff;border-color:#d5e7f3}#yddBottom{color:#363636}#yddWrapper{min-width:250px;max-width:400px;}</style></html>

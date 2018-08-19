@@ -33,7 +33,7 @@ public class MyWebSocket {
 
     @OnMessage
     public void onMessage(String message, Session session) throws IOException {
-        System.out.println("收到消息:【" + message + "】,Thread ID:" + Thread.currentThread().getId() + ",Thread Name:" + Thread.currentThread().getName());
+//        System.out.println("收到消息:【" + message + "】,Thread ID:" + Thread.currentThread().getId() + ",Thread Name:" + Thread.currentThread().getName());
         if (message.contains("#")) {
             String[] msgMap = message.split("#");
             String targetId = msgMap[0];
